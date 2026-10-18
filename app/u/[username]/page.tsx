@@ -1,4 +1,4 @@
-
+import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ProfileView from "@/app/me/profile-view";
@@ -8,6 +8,7 @@ export default async function PublicProfilePage({
 }: {
   params: Promise<{ username: string }>;
 }) {
+  // await connection();
   const { username } = await params;
 
   const profile = await prisma.alumniProfile.findUnique({
