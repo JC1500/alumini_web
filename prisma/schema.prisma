@@ -1,0 +1,33 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AlumniProfile {
+  id             String   @id @default(cuid())
+  clerkUserId    String   @unique
+  fullName       String
+  username       String   @unique
+  headline       String?
+  bio            String?  @db.Text
+  avatarUrl      String?
+  department     String?
+  graduationYear Int?
+  degree         String?
+  company        String?
+  jobTitle       String?
+  location       String?
+  skills         String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([fullName])
+  @@index([graduationYear])
+  @@index([department])
+  @@index([company])
+}
