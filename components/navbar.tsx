@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Show, useClerk, useUser } from "@clerk/nextjs";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -60,6 +61,7 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <Show when="signed-out">
             <Link
               href="/sign-in"

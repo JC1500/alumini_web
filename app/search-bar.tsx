@@ -15,13 +15,14 @@ export default function SearchBar() {
           <path d="m16 16 4 4" />
         </svg>
 
-        <input
-          type="search"
-          name="q"
-          placeholder="Search alumni by name, company, or department..."
-          aria-label="Search alumni"
-          className="w-full bg-transparent text-sm outline-none"
-        />
+<input
+  type="text"
+  name="q"
+  autoComplete="off"
+  placeholder="Search alumni by name, company, or department..."
+  aria-label="Search alumni"
+  className="w-full bg-transparent text-foreground placeholder:text-muted-foreground outline-none border-none focus:ring-0"
+/>
 
         <button
           type="submit"
