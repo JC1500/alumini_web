@@ -1,9 +1,9 @@
-
 "use client";
 
 import { useState } from "react";
 import type { AlumniProfile } from "@/lib/generated/prisma/client";
 import ProfileForm from "./profile-form";
+import ProfileImageManager from "@/components/profile/ProfileImageManager";
 
 export default function ProfileView({
   profile,
@@ -13,6 +13,14 @@ export default function ProfileView({
   editable?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+
+  const [profileImageUrl, setProfileImageUrl] = useState(
+  profile.profileImageUrl,
+);
+
+const [coverImageUrl, setCoverImageUrl] = useState(
+  profile.coverImageUrl,
+);
 
   const initial = profile.fullName.trim().charAt(0).toUpperCase();
 
@@ -41,14 +49,30 @@ export default function ProfileView({
     <div className="mx-auto max-w-4xl space-y-5">
       {/* Profile header */}
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-        <div className="h-32 bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 sm:h-44" />
+        <div className="relative h-32 overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 sm:h-44">
+  {coverImageUrl && (
+    <img
+      src={coverImageUrl}
+      alt={`${profile.fullName}'s cover`}
+      className="absolute inset-0 h-full w-full object-cover"
+    />
+  )}
+</div>
 
         <div className="px-5 pb-6 sm:px-8">
           <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
-              <div className="flex size-24 shrink-0 items-center justify-center rounded-full border-4 border-white bg-blue-100 text-4xl font-bold text-blue-800 dark:border-gray-950 dark:bg-blue-950 dark:text-blue-200 sm:size-28">
-                {initial || "A"}
-              </div>
+              <div className="relative flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-blue-100 text-4xl font-bold text-blue-800 dark:border-gray-950 dark:bg-blue-950 dark:text-blue-200 sm:size-28">
+  {profileImageUrl ? (
+    <img
+      src={profileImageUrl}
+      alt={`${profile.fullName}'s profile photo`}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    initial || "A"
+  )}
+</div>
             </div>
 
            {editable ? (
@@ -114,6 +138,27 @@ export default function ProfileView({
           </div>
         </div>
       </section>
+
+      {editable && (
+  <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950">
+    <h2 className="mb-4 text-lg font-bold">
+      Profile appearance
+    </h2>
+
+    <ProfileImageManager
+      name={profile.fullName}
+      profileImageUrl={profileImageUrl}
+      coverImageUrl={coverImageUrl}
+      onUpdated={(type, url) => {
+        if (type === "avatar") {
+          setProfileImageUrl(url);
+        } else {
+          setCoverImageUrl(url);
+        }
+      }}
+    />
+  </section>
+)}
 
       {/* About */}
       {profile.bio && (

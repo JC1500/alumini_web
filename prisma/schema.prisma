@@ -14,7 +14,10 @@ model AlumniProfile {
   username       String   @unique
   headline       String
   bio            String  @db.Text
-  avatarUrl      String?
+  profileImageUrl String?
+  profileImageKey String?
+  coverImageUrl   String?
+  coverImageKey   String?
   department     String
   graduationYear Int
   degree         String?
