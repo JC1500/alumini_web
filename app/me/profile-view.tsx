@@ -51,7 +51,7 @@ export default function ProfileView({
               </div>
             </div>
 
-            {editable && (
+           {editable ? (
   <button
     type="button"
     onClick={() => setIsEditing(true)}
@@ -59,6 +59,22 @@ export default function ProfileView({
   >
     Edit profile
   </button>
+) : (
+  <a
+    href={`/messages?username=${encodeURIComponent(profile.username)}`}
+    className="inline-flex items-center gap-2 rounded-full bg-blue-400 px-6 py-3 text-base font-semibold text-gray-950 shadow-sm transition hover:bg-blue-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 dark:focus:ring-offset-gray-950"
+  >
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="size-5"
+      aria-hidden="true"
+    >
+      <path d="M21.7 2.3a1 1 0 0 0-1.03-.24l-18 7a1 1 0 0 0 .04 1.88l7.05 2.35 2.35 7.05a1 1 0 0 0 .91.66h.03a1 1 0 0 0 .92-.6l7-18a1 1 0 0 0-.27-1.1ZM11.2 12.8l-6.1-2.03 12.05-4.69-5.95 6.72Zm1.4 1.4 5.96-6.73-4.7 12.1-2.03-6.1.77.73Z" />
+    </svg>
+
+    Message
+  </a>
 )}
           </div>
 
