@@ -2,13 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import {
-  HeadObjectCommand,
-  getPublicImageUrl,
-  r2,
-  bucketName,
-  DeleteObjectCommand,
-} from "@/lib/r2";
 
 type PostImageInput = {
   imageUrl: string;
@@ -21,6 +14,15 @@ async function cleanupUnusedUploads(
   clerkUserId: string,
   keys: string[],
 ) {
+  let r2Module: typeof import("@/lib/r2");
+
+  try {
+    r2Module = await import("@/lib/r2");
+  } catch (error) {
+    console.error("Unable to initialize R2 while cleaning up uploads:", error);
+    return;
+  }
+
   for (const key of keys) {
     try {
       const deleted = await prisma.pendingPostImage.deleteMany({
@@ -33,9 +35,9 @@ async function cleanupUnusedUploads(
 
       if (deleted.count === 1) {
         try {
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: bucketName,
+          await r2Module.r2.send(
+            new r2Module.DeleteObjectCommand({
+              Bucket: r2Module.bucketName,
               Key: key,
             }),
           );
@@ -187,6 +189,12 @@ export async function POST(request: NextRequest) {
     const seenKeys = new Set<string>();
 
     for (const image of imageData) {
+      const {
+        HeadObjectCommand,
+        getPublicImageUrl,
+        r2,
+        bucketName,
+      } = await import("@/lib/r2");
       const expectedPrefix = `posts/${userId}/`;
 
       if (
@@ -397,20 +405,35 @@ export async function DELETE(request: NextRequest) {
     });
 
     // Delete the associated R2 objects after the DB deletion succeeds.
-    const cleanupResults = await Promise.allSettled(
-      post.images.map((image) =>
-        r2.send(
-          new DeleteObjectCommand({
-            Bucket: bucketName,
-            Key: image.imageKey,
-          }),
-        ),
-      ),
-    );
+    let failedCleanupCount = 0;
 
-    const failedCleanupCount = cleanupResults.filter(
-      (result) => result.status === "rejected",
-    ).length;
+    if (post.images.length > 0) {
+      try {
+        const { r2, bucketName, DeleteObjectCommand } = await import(
+          "@/lib/r2"
+        );
+        const cleanupResults = await Promise.allSettled(
+          post.images.map((image) =>
+            r2.send(
+              new DeleteObjectCommand({
+                Bucket: bucketName,
+                Key: image.imageKey,
+              }),
+            ),
+          ),
+        );
+
+        failedCleanupCount = cleanupResults.filter(
+          (result) => result.status === "rejected",
+        ).length;
+      } catch (error) {
+        console.error(
+          `Failed to initialize R2 while deleting images for post ${post.id}:`,
+          error,
+        );
+        failedCleanupCount = post.images.length;
+      }
+    }
 
     if (failedCleanupCount > 0) {
       console.error(
