@@ -45,6 +45,15 @@ export default function Navbar() {
             Home
           </Link>
 
+          <Show when="signed-in">
+            <Link
+              href="/feed"
+              className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300"
+            >
+              Feed
+            </Link>
+          </Show>
+
           <Link
             href="/search"
             className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300"
@@ -62,6 +71,7 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
+
           <Show when="signed-out">
             <Link
               href="/sign-in"
@@ -133,6 +143,14 @@ export default function Navbar() {
                       className="mt-1 block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       My Profile
+                    </Link>
+
+                    <Link
+                      href="/feed"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      Feed
                     </Link>
 
                     <Link
