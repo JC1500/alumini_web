@@ -42,10 +42,23 @@ export default function ProfilePosts({
           { cache: "no-store" },
         );
 
-        const data = await response.json();
+        let data: { posts?: Post[]; error?: string };
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error(
+            `Failed to load posts (HTTP ${response.status}; the server returned an empty or invalid response).`,
+          );
+        }
 
         if (!response.ok) {
-          throw new Error(data.error || "Failed to load posts.");
+          throw new Error(
+            data.error || `Failed to load posts (HTTP ${response.status}).`,
+          );
+        }
+
+        if (!Array.isArray(data.posts)) {
+          throw new Error("The server returned an invalid posts response.");
         }
 
         if (!cancelled) {
@@ -94,10 +107,19 @@ export default function ProfilePosts({
         { method: "DELETE" },
       );
 
-      const data = await response.json();
+      let data: { error?: string };
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(
+          `Failed to delete post (HTTP ${response.status}; the server returned an empty or invalid response).`,
+        );
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to delete post.");
+        throw new Error(
+          data.error || `Failed to delete post (HTTP ${response.status}).`,
+        );
       }
 
       // Remove the deleted post immediately from the UI.
