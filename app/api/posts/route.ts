@@ -330,3 +330,106 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+export async function DELETE(request: NextRequest) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return NextResponse.json(
+      { error: "You must be logged in to delete a post." },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const profile = await prisma.alumniProfile.findUnique({
+      where: { clerkUserId: userId },
+      select: { id: true },
+    });
+
+    if (!profile) {
+      return NextResponse.json(
+        { error: "Alumni profile not found." },
+        { status: 404 },
+      );
+    }
+
+    const postId = request.nextUrl.searchParams.get("id")?.trim();
+
+    if (!postId) {
+      return NextResponse.json(
+        { error: "Post ID is required." },
+        { status: 400 },
+      );
+    }
+
+    // Verify ownership before deleting anything.
+    const post = await prisma.post.findFirst({
+      where: {
+        id: postId,
+        authorId: profile.id,
+      },
+      select: {
+        id: true,
+        images: {
+          select: {
+            imageKey: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      return NextResponse.json(
+        { error: "Post not found or you cannot delete it." },
+        { status: 404 },
+      );
+    }
+
+    // Delete the post and its PostImage records.
+    // Your Prisma cascade relation handles the associated records.
+    
+    // Delete the database record first.
+    // The related PostImage records are removed by Prisma's cascade.
+    await prisma.post.delete({
+      where: { id: post.id },
+    });
+
+    // Delete the associated R2 objects after the DB deletion succeeds.
+    const cleanupResults = await Promise.allSettled(
+      post.images.map((image) =>
+        r2.send(
+          new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: image.imageKey,
+          }),
+        ),
+      ),
+    );
+
+    const failedCleanupCount = cleanupResults.filter(
+      (result) => result.status === "rejected",
+    ).length;
+
+    if (failedCleanupCount > 0) {
+      console.error(
+        `Failed to delete ${failedCleanupCount} R2 image(s) for post ${post.id}.`,
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Post deleted successfully.",
+      imageCleanupPending: failedCleanupCount > 0,
+    });
+
+  } catch (error) {
+    console.error("Delete post error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to delete post." },
+      { status: 500 },
+    );
+  }
+}

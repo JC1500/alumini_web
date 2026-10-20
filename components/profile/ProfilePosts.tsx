@@ -27,7 +27,8 @@ export default function ProfilePosts({
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
-
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -53,9 +54,7 @@ export default function ProfilePosts({
       } catch (err: unknown) {
         if (!cancelled) {
           setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to load posts.",
+            err instanceof Error ? err.message : "Failed to load posts.",
           );
         }
       } finally {
@@ -69,21 +68,53 @@ export default function ProfilePosts({
       void fetchPosts();
     }
 
-    // Load posts when the component mounts.
     void fetchPosts();
 
-    // Reload posts whenever a new post is published.
     window.addEventListener("posts-updated", handlePostsUpdated);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(
-        "posts-updated",
-        handlePostsUpdated,
-      );
+      window.removeEventListener("posts-updated", handlePostsUpdated);
     };
   }, [username]);
 
+  async function handleDeletePost(postId: string) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this post? This action cannot be undone.",
+    );
+
+    if (!confirmed) return;
+
+    setDeletingPostId(postId);
+    setDeleteError("");
+
+    try {
+      const response = await fetch(
+        `/api/posts?id=${encodeURIComponent(postId)}`,
+        { method: "DELETE" },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete post.");
+      }
+
+      // Remove the deleted post immediately from the UI.
+      setPosts((currentPosts) =>
+        currentPosts.filter((post) => post.id !== postId),
+      );
+
+      // Notify any other components that the posts have changed.
+      window.dispatchEvent(new Event("posts-updated"));
+    } catch (err: unknown) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete post.",
+      );
+    } finally {
+      setDeletingPostId(null);
+    }
+  }
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-7">
@@ -107,6 +138,12 @@ export default function ProfilePosts({
         </div>
       )}
 
+      {deleteError && (
+        <p role="alert" className="mt-4 text-sm text-red-600">
+          {deleteError}
+        </p>
+      )}
+
       {loading ? (
         <p className="mt-5 text-sm text-gray-500">Loading posts...</p>
       ) : error ? (
@@ -122,8 +159,72 @@ export default function ProfilePosts({
               key={post.id}
               className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
             >
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-xs text-gray-500">
+                  {new Date(post.createdAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+
+                {editable && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePost(post.id)}
+                    disabled={deletingPostId !== null}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950"
+                    aria-label="Delete post"
+                  >
+                    {deletingPostId === post.id ? (
+                      <>
+                        <svg
+                          className="h-4 w-4 animate-spin"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                          />
+                        </svg>
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          aria-hidden="true"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6"
+                          />
+                        </svg>
+                        Delete
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
               {post.text && (
-                <p className="whitespace-pre-wrap break-words text-sm leading-7 text-gray-800 dark:text-gray-200">
+                <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-gray-800 dark:text-gray-200">
                   {post.text}
                 </p>
               )}
@@ -141,14 +242,6 @@ export default function ProfilePosts({
                   ))}
                 </div>
               )}
-
-              <p className="mt-3 text-xs text-gray-500">
-                {new Date(post.createdAt).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
             </article>
           ))}
         </div>

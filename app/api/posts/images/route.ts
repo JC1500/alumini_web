@@ -1,6 +1,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 
