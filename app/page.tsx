@@ -1,6 +1,7 @@
 
 import Link from "next/link";
 import { Show } from "@clerk/nextjs";
+import { Suspense } from "react";
 
 const features = [
   {
@@ -53,37 +54,39 @@ export default function HomePage() {
             </p>
 
             <div className="mt-9 flex flex-wrap gap-3">
-              <Show when="signed-out">
-                <Link
-                  href="/sign-up"
-                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500"
-                >
-                  Join the community <span aria-hidden="true">→</span>
-                </Link>
+              <Suspense fallback={null}>
+                <Show when="signed-out">
+                  <Link
+                    href="/sign-up"
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    Join the community <span aria-hidden="true">→</span>
+                  </Link>
 
-                <Link
-                  href="/sign-in"
-                  className="inline-flex items-center rounded-full border border-white/20 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  Sign in
-                </Link>
-              </Show>
+                  <Link
+                    href="/sign-in"
+                    className="inline-flex items-center rounded-full border border-white/20 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    Sign in
+                  </Link>
+                </Show>
 
-              <Show when="signed-in">
-                <Link
-                  href="/search"
-                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500"
-                >
-                  Explore alumni <span aria-hidden="true">→</span>
-                </Link>
+                <Show when="signed-in">
+                  <Link
+                    href="/search"
+                    className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-blue-500"
+                  >
+                    Explore alumni <span aria-hidden="true">→</span>
+                  </Link>
 
-                <Link
-                  href="/me"
-                  className="inline-flex items-center rounded-full border border-white/20 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  View my profile
-                </Link>
-              </Show>
+                  <Link
+                    href="/me"
+                    className="inline-flex items-center rounded-full border border-white/20 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                  >
+                    View my profile
+                  </Link>
+                </Show>
+              </Suspense>
             </div>
 
             <p className="mt-6 text-sm text-slate-400">
@@ -215,23 +218,25 @@ export default function HomePage() {
               </p>
             </div>
 
-            <Show when="signed-out">
-              <Link
-                href="/sign-up"
-                className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
-              >
-                Get started <span aria-hidden="true">→</span>
-              </Link>
-            </Show>
+            <Suspense fallback={null}>
+              <Show when="signed-out">
+                <Link
+                  href="/sign-up"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                >
+                  Get started <span aria-hidden="true">→</span>
+                </Link>
+              </Show>
 
-            <Show when="signed-in">
-              <Link
-                href="/search"
-                className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
-              >
-                Find alumni <span aria-hidden="true">→</span>
-              </Link>
-            </Show>
+              <Show when="signed-in">
+                <Link
+                  href="/search"
+                  className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+                >
+                  Find alumni <span aria-hidden="true">→</span>
+                </Link>
+              </Show>
+            </Suspense>
           </div>
         </div>
       </section>
