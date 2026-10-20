@@ -1,0 +1,2 @@
+ALTER TABLE "AlumniProfile"
+ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT;
