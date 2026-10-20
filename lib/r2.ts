@@ -5,6 +5,7 @@ import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 
 const accountId = process.env.R2_ACCOUNT_ID?.trim();
@@ -29,7 +30,7 @@ export const r2 = new S3Client({
   responseChecksumValidation: "WHEN_REQUIRED",
 });
 
-export { PutObjectCommand, DeleteObjectCommand };
+export { PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, };
 export { bucketName };
 
 export function getPublicImageUrl(key: string) {

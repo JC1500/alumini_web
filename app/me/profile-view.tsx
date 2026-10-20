@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AlumniProfile } from "@/lib/generated/prisma/client";
 import ProfileForm from "./profile-form";
 import ProfileImageManager from "@/components/profile/ProfileImageManager";
+import ProfilePosts from "@/components/profile/ProfilePosts";
 
 export default function ProfileView({
   profile,
@@ -170,6 +171,10 @@ const [coverImageUrl, setCoverImageUrl] = useState(
         </section>
       )}
 
+      <ProfilePosts
+  username={profile.username}
+  editable={editable}
+/>
       {/* Experience */}
       {(profile.company || profile.jobTitle) && (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-7">

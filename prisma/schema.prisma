@@ -31,6 +31,8 @@ model AlumniProfile {
   district       String
   city           String
 
+  posts Post[]
+
   skills         String[] @default([])
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -39,4 +41,43 @@ model AlumniProfile {
   @@index([graduationYear])
   @@index([department])
   @@index([company])
+}
+
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  text      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author AlumniProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images PostImage[]
+
+  @@index([authorId, createdAt])
+}
+
+model PostImage {
+  id        String   @id @default(cuid())
+  postId    String
+  imageUrl  String
+  imageKey  String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+}
+
+
+model PendingPostImage {
+  id          String   @id @default(cuid())
+  clerkUserId String
+  imageUrl    String
+  imageKey    String   @unique
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  consumedAt  DateTime?
+
+  @@index([clerkUserId, expiresAt])
 }
