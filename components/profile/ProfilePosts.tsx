@@ -1,8 +1,8 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
 import CreatePostForm from "@/components/CreatePostForm";
+import ConfirmDeleteModal from "../confirm-delete-modal";
 
 type PostImage = {
   id: string;
@@ -27,8 +27,9 @@ export default function ProfilePosts({
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState("");
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +44,7 @@ export default function ProfilePosts({
         );
 
         let data: { posts?: Post[]; error?: string };
+
         try {
           data = await response.json();
         } catch {
@@ -61,9 +63,7 @@ export default function ProfilePosts({
           throw new Error("The server returned an invalid posts response.");
         }
 
-        if (!cancelled) {
-          setPosts(data.posts);
-        }
+        if (!cancelled) setPosts(data.posts);
       } catch (err: unknown) {
         if (!cancelled) {
           setError(
@@ -71,9 +71,7 @@ export default function ProfilePosts({
           );
         }
       } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       }
     }
 
@@ -82,7 +80,6 @@ export default function ProfilePosts({
     }
 
     void fetchPosts();
-
     window.addEventListener("posts-updated", handlePostsUpdated);
 
     return () => {
@@ -92,13 +89,6 @@ export default function ProfilePosts({
   }, [username]);
 
   async function handleDeletePost(postId: string) {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this post? This action cannot be undone.",
-    );
-
-    if (!confirmed) return;
-
-    setDeletingPostId(postId);
     setDeleteError("");
 
     try {
@@ -108,6 +98,7 @@ export default function ProfilePosts({
       );
 
       let data: { error?: string };
+
       try {
         data = await response.json();
       } catch {
@@ -122,19 +113,26 @@ export default function ProfilePosts({
         );
       }
 
-      // Remove the deleted post immediately from the UI.
       setPosts((currentPosts) =>
         currentPosts.filter((post) => post.id !== postId),
       );
-
-      // Notify any other components that the posts have changed.
+      setPostToDelete(null);
       window.dispatchEvent(new Event("posts-updated"));
     } catch (err: unknown) {
       setDeleteError(
         err instanceof Error ? err.message : "Failed to delete post.",
       );
+    }
+  }
+
+  async function confirmDeletePost() {
+    if (!postToDelete || deleting) return;
+
+    setDeleting(true);
+    try {
+      await handleDeletePost(postToDelete);
     } finally {
-      setDeletingPostId(null);
+      setDeleting(false);
     }
   }
 
@@ -179,7 +177,7 @@ export default function ProfilePosts({
           {posts.map((post) => (
             <article
               key={post.id}
-              className="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
+              className="rounded-xl relative border border-gray-200 p-4 dark:border-gray-800"
             >
               <div className="flex items-start justify-between gap-3">
                 <p className="text-xs text-gray-500">
@@ -193,54 +191,29 @@ export default function ProfilePosts({
                 {editable && (
                   <button
                     type="button"
-                    onClick={() => void handleDeletePost(post.id)}
-                    disabled={deletingPostId !== null}
+                    onClick={() => {
+                      setDeleteError("");
+                      setPostToDelete(post.id);
+                    }}
+                    disabled={deleting}
                     className="inline-flex shrink-0 items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950"
                     aria-label="Delete post"
                   >
-                    {deletingPostId === post.id ? (
-                      <>
-                        <svg
-                          className="h-4 w-4 animate-spin"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          aria-hidden="true"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                          />
-                        </svg>
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          className="h-4 w-4"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6"
-                          />
-                        </svg>
-                        Delete
-                      </>
-                    )}
+                    <svg
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6"
+                      />
+                    </svg>
+                    Delete
                   </button>
                 )}
               </div>
@@ -264,6 +237,19 @@ export default function ProfilePosts({
                   ))}
                 </div>
               )}
+              <ConfirmDeleteModal
+        open={postToDelete === post.id}
+        title="Delete this post?"
+        description="This post will be permanently deleted. This action cannot be undone."
+        loading={deleting}
+        onCancel={() => {
+          if (!deleting) {
+            setPostToDelete(null);
+            setDeleteError("");
+          }
+        }}
+        onConfirm={confirmDeletePost}
+      />
             </article>
           ))}
         </div>

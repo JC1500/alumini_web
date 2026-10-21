@@ -9,6 +9,7 @@ import {
   type ChangeEvent,
 } from "react";
 import Cropper, { type Area } from "react-easy-crop";
+import ConfirmDeleteModal from "../confirm-delete-modal";
 
 type ImageType = "avatar" | "cover";
 
@@ -96,6 +97,7 @@ const ProfileImageManager = forwardRef<
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const currentImage =
     type === "avatar" ? profileImageUrl : coverImageUrl;
@@ -184,37 +186,36 @@ const ProfileImageManager = forwardRef<
     }
   }
 
-  async function deleteImage() {
-    if (!currentImage) return;
+async function deleteImage() {
+  if (!currentImage) return;
 
-    if (!window.confirm("Delete this image?")) return;
+  setBusy(true);
+  setError("");
 
-    setBusy(true);
-    setError("");
+  try {
+    const response = await fetch("/api/profile/image", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    });
 
-    try {
-      const response = await fetch("/api/profile/image", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-      });
+    const result = await response.json();
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || "Could not delete image.");
-      }
-
-      onUpdated(type, null);
-      setOpen(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Delete failed.",
-      );
-    } finally {
-      setBusy(false);
+    if (!response.ok) {
+      throw new Error(result.error || "Could not delete image.");
     }
+
+    onUpdated(type, null);
+    setShowDeleteConfirm(false);
+    setOpen(false);
+  } catch (err) {
+    setError(
+      err instanceof Error ? err.message : "Delete failed.",
+    );
+  } finally {
+    setBusy(false);
   }
+}
 
   return (
     <>
@@ -306,7 +307,7 @@ const ProfileImageManager = forwardRef<
             role="dialog"
             aria-modal="true"
             aria-labelledby="image-dialog-title"
-            className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1b1f22] text-white shadow-2xl"
+            className="flex relative max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#1b1f22] text-white shadow-2xl"
           >
             <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <h2
@@ -439,7 +440,7 @@ const ProfileImageManager = forwardRef<
 
                   <button
                     type="button"
-                    onClick={deleteImage}
+                    onClick={() => setShowDeleteConfirm(true)}
                     disabled={busy || !currentImage}
                     className="ml-auto rounded-lg px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 disabled:opacity-40"
                   >
@@ -474,6 +475,17 @@ const ProfileImageManager = forwardRef<
                 </p>
               )}
             </footer>
+
+            <ConfirmDeleteModal
+  open={showDeleteConfirm}
+  title={`Delete ${
+    type === "avatar" ? "profile photo" : "cover image"
+  }?`}
+  description="This image will be permanently deleted. This action cannot be undone."
+  loading={busy}
+  onCancel={() => setShowDeleteConfirm(false)}
+  onConfirm={deleteImage}
+/>
           </section>
         </div>
       )}
