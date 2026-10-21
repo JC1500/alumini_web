@@ -1,4 +1,5 @@
-
+--Drop column avatarURL--
+ALTER TABLE "AlumniProfile" DROP COLUMN iF EXISTS "avatarUrl";
 -- CreateTable
 CREATE TABLE "Conversation" (
     "id" TEXT NOT NULL,
