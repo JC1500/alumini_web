@@ -36,6 +36,7 @@ model AlumniProfile {
   conversationsAsParticipantB Conversation[] @relation("ConversationParticipantB")
   conversationParticipants ConversationParticipant[]
   sentMessages Message[]
+  favourites Favourite[]
 
   skills         String[] @default([])
   createdAt      DateTime @default(now())
@@ -57,6 +58,7 @@ model Post {
 
   author AlumniProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
   images PostImage[]
+  favourites Favourite[]
 
   @@index([authorId, createdAt])
 }
@@ -128,4 +130,18 @@ model Message {
 
   @@unique([senderId, clientId])
   @@index([conversationId, createdAt(sort: Desc)])
+}
+
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user AlumniProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+  @@index([postId])
 }
