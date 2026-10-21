@@ -32,6 +32,10 @@ model AlumniProfile {
   city           String
 
   posts Post[]
+  conversationsAsParticipantA Conversation[] @relation("ConversationParticipantA")
+  conversationsAsParticipantB Conversation[] @relation("ConversationParticipantB")
+  conversationParticipants ConversationParticipant[]
+  sentMessages Message[]
 
   skills         String[] @default([])
   createdAt      DateTime @default(now())
@@ -80,4 +84,48 @@ model PendingPostImage {
   consumedAt  DateTime?
 
   @@index([clerkUserId, expiresAt])
+}
+
+model Conversation {
+  id             String   @id @default(cuid())
+  participantAId String
+  participantBId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastMessageAt  DateTime @default(now())
+
+  participantA AlumniProfile @relation("ConversationParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB AlumniProfile @relation("ConversationParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@unique([participantAId, participantBId])
+}
+
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         AlumniProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  senderId       String
+  clientId       String    @db.Uuid
+  body           String    @db.VarChar(2000)
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime?
+
+  conversation Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       AlumniProfile @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, clientId])
+  @@index([conversationId, createdAt(sort: Desc)])
 }
