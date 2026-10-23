@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 
 type PostImageInput = {
   imageUrl: string;
@@ -61,8 +62,30 @@ async function cleanupUnusedUploads(
 
 // GET /api/posts?username=mayank
 // Fetch posts belonging to a public alumni profile.
+
 export async function GET(request: NextRequest) {
   try {
+    const session = await getVerifiedUser();
+
+    if (!session) {
+      const currentSession = await getCurrentUser();
+
+      if (!currentSession) {
+        return NextResponse.json(
+          { error: "Unauthorized." },
+          { status: 401 },
+        );
+      }
+
+      return NextResponse.json(
+        {
+          error: "Complete personal and college email verification to view posts.",
+          code: "ACCOUNT_VERIFICATION_REQUIRED",
+        },
+        { status: 403 },
+      );
+    }
+
     const username = request.nextUrl.searchParams
       .get("username")
       ?.trim();
@@ -107,10 +130,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
 // POST /api/posts
 // Create a post and atomically consume its pending images.
 export async function POST(request: NextRequest) {
-  const session = await getCurrentUser();
+  const session = await getVerifiedUser();
+
+
 
   if (!session) {
     return NextResponse.json(
@@ -241,19 +267,19 @@ export async function POST(request: NextRequest) {
       imageData.length === 0
         ? []
         : await prisma.pendingPostImage.findMany({
-            where: {
-              clerkUserId: userId,
-              imageKey: {
-                in: imageData.map((image) => image.imageKey),
-              },
-              consumedAt: null,
-              expiresAt: { gt: new Date() },
+          where: {
+            clerkUserId: userId,
+            imageKey: {
+              in: imageData.map((image) => image.imageKey),
             },
-            select: {
-              imageKey: true,
-              imageUrl: true,
-            },
-          });
+            consumedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: {
+            imageKey: true,
+            imageUrl: true,
+          },
+        });
 
     const pendingByKey = new Map(
       pendingImages.map((image) => [
@@ -341,12 +367,15 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/posts?id=POST_ID
 export async function DELETE(request: NextRequest) {
-  const session = await getCurrentUser();
+  const session = await getVerifiedUser();
 
   if (!session) {
     return NextResponse.json(
-      { error: "You must be logged in to delete a post." },
-      { status: 401 },
+      {
+        error: "Complete both email verifications to create posts.",
+        code: "ACCOUNT_VERIFICATION_REQUIRED",
+      },
+      { status: 403 },
     );
   }
 

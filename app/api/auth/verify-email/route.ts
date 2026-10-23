@@ -1,5 +1,3 @@
-
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -126,32 +124,25 @@ export async function POST(request: Request) {
         throw new Error("ACCOUNT_ALREADY_EXISTS");
       }
 
+
       const createdUser = await tx.user.create({
         data: {
           email,
           passwordHash: currentPending.passwordHash,
+
+          // Personal email has been verified.
           emailVerified: true,
-          profile: {
-            create: {
-              // New custom-auth profiles do not need a Clerk user ID.
-              clerkUserId: null,
-              fullName: email.split("@")[0],
-              username: `user_${randomUUID()
-                .replace(/-/g, "")
-                .slice(0, 16)}`,
-              headline: "",
-              bio: "",
-              department: "",
-              graduationYear: new Date().getFullYear(),
-              location: "",
-              state: "",
-              district: "",
-              city: "",
-            },
-          },
+
+          // College verification is still required.
+          collegeEmail: null,
+          collegeEmailVerified: false,
+
+          // Account remains pending until college verification.
+          status: "PENDING_COLLEGE_VERIFICATION",
         },
         select: { id: true },
       });
+
 
       await tx.pendingRegistration.delete({
         where: { id: currentPending.id },
@@ -160,10 +151,14 @@ export async function POST(request: Request) {
       return createdUser;
     });
 
+    // A session allows the user to continue to college verification.
+    // Protected resources must separately enforce the account status.
     await createSession(user.id);
 
     return NextResponse.json({
-      message: "Email verified and account created.",
+      message:
+        "Personal email verified. Verify your college email to activate your account.",
+      nextStep: "COLLEGE_EMAIL_VERIFICATION",
     });
   } catch (error) {
     if (

@@ -1,21 +1,23 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 
 export async function GET() {
   try {
-    // Authenticate using the custom session system.
-    const session = await getCurrentUser();
+    // Only fully verified, active users can view saved posts.
+    const session = await getVerifiedUser();
 
     if (!session) {
       return NextResponse.json(
-        { error: "You must be signed in to view saved posts." },
-        { status: 401 },
+        {
+          error: "Complete both email verifications to view saved posts.",
+          code: "ACCOUNT_VERIFICATION_REQUIRED",
+        },
+        { status: 403 },
       );
     }
 
-    // Find the alumni profile linked to the authenticated user.
     const profile = await prisma.alumniProfile.findUnique({
       where: { userId: session.user.id },
       select: { id: true },
@@ -28,7 +30,6 @@ export async function GET() {
       );
     }
 
-    // Fetch saved posts, newest favourites first.
     const favourites = await prisma.favourite.findMany({
       where: { userId: profile.id },
       orderBy: { createdAt: "desc" },

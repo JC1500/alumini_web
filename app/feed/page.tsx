@@ -1,15 +1,22 @@
 
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 import FeedList from "@/components/feed/FeedList";
 
 export const dynamic = "force-dynamic";
 
 export default async function FeedPage() {
-  const session = await getCurrentUser();
+  const session = await getVerifiedUser();
 
   if (!session) {
-    redirect("/sign-in");
+    const currentSession = await getCurrentUser();
+
+    if (!currentSession) {
+      redirect("/sign-in");
+    }
+
+    redirect("/verify-college-email");
   }
 
   return (

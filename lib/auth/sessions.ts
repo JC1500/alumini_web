@@ -66,7 +66,9 @@ export async function getCurrentUser() {
     return null;
   }
 
-  if (session.user.status !== "ACTIVE") {
+  // Reject suspended accounts, but preserve valid sessions for
+  // users who still need to complete email verification.
+  if (session.user.status === "SUSPENDED") {
     await prisma.session.deleteMany({
       where: { id: session.id },
     });
@@ -83,6 +85,8 @@ export async function getCurrentUser() {
       id: user.id,
       email: user.email,
       emailVerified: user.emailVerified,
+      collegeEmail: user.collegeEmail,
+      collegeEmailVerified: user.collegeEmailVerified,
       phoneVerified: user.phoneVerified,
       status: user.status,
       profile: user.profile

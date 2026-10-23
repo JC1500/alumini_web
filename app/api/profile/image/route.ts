@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 import {
   r2,
   bucketName,
@@ -33,16 +33,21 @@ const IMAGE_CONFIG = {
 export async function POST(request: Request) {
   try {
     // 1. Authenticate using the custom session system.
-    const session = await getCurrentUser();
+    // 1. Require a fully verified, active account.
+const session = await getVerifiedUser();
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+if (!session) {
+  return NextResponse.json(
+    {
+      error:
+        "Complete personal and college email verification to upload profile images.",
+      code: "ACCOUNT_VERIFICATION_REQUIRED",
+    },
+    { status: 403 },
+  );
+}
 
-    const userId = session.user.id;
+const userId = session.user.id;
 
     // 2. Read the multipart form.
     const formData = await request.formData();
@@ -235,16 +240,21 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     // 1. Authenticate using the custom session system.
-    const session = await getCurrentUser();
+    // 1. Require a fully verified, active account.
+const session = await getVerifiedUser();
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 },
-      );
-    }
+if (!session) {
+  return NextResponse.json(
+    {
+      error:
+        "Complete personal and college email verification to manage profile images.",
+      code: "ACCOUNT_VERIFICATION_REQUIRED",
+    },
+    { status: 403 },
+  );
+}
 
-    const userId = session.user.id;
+const userId = session.user.id;
 
     // 2. Validate the requested image type.
     const body: unknown = await request.json();

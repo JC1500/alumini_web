@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 import {
   r2,
   bucketName,
@@ -27,16 +27,20 @@ export async function POST(request: Request) {
 
   try {
     // 1. Authenticate using the custom session system.
-    const session = await getCurrentUser();
+    const session = await getVerifiedUser();
 
-    if (!session) {
-      return NextResponse.json(
-        { error: "You must be logged in to upload images." },
-        { status: 401 },
-      );
-    }
+if (!session) {
+  return NextResponse.json(
+    {
+      error:
+        "Complete personal and college email verification to upload images.",
+      code: "ACCOUNT_VERIFICATION_REQUIRED",
+    },
+    { status: 403 },
+  );
+}
 
-    userId = session.user.id;
+userId = session.user.id;
 
     // 2. Find the profile linked to this database user.
     const profile = await prisma.alumniProfile.findUnique({

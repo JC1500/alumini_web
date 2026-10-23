@@ -1,19 +1,24 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 
 // GET /api/feed
 // GET /api/feed?cursor=POST_ID&limit=10
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate using the custom session cookie.
-    const session = await getCurrentUser();
+    // Only users who have verified both email addresses
+    // and have an ACTIVE account may access the feed.
+    const session = await getVerifiedUser();
 
     if (!session) {
       return NextResponse.json(
-        { error: "You must be logged in to view the feed." },
-        { status: 401 },
+        {
+          error:
+            "Complete both personal and college email verification to access the feed.",
+          code: "ACCOUNT_VERIFICATION_REQUIRED",
+        },
+        { status: 403 },
       );
     }
 

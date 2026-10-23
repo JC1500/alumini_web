@@ -147,6 +147,9 @@ model Favourite {
 }
 
 enum UserStatus {
+  PENDING_PERSONAL_VERIFICATION
+  PENDING_COLLEGE_VERIFICATION
+  PENDING_PROFILE_COMPLETION
   ACTIVE
   SUSPENDED
 }
@@ -156,18 +159,35 @@ enum OAuthProvider {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
+  id            String  @id @default(cuid())
+  email         String  @unique
   passwordHash  String?
-  emailVerified Boolean    @default(false)
-  phoneNumber   String?    @unique
-  phoneVerified Boolean    @default(false)
-  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean @default(false)
+
+  // College email verification
+  collegeEmail         String? @unique
+  collegeEmailVerified Boolean @default(false)
+
+  phoneNumber   String? @unique
+  phoneVerified Boolean @default(false)
+
+  // Accounts must complete both email verification steps.
+  status UserStatus @default(PENDING_PERSONAL_VERIFICATION)
 
   oauthAccounts OAuthAccount[]
   sessions      Session[]
   profile       AlumniProfile?
   resetTokens   PasswordResetToken[]
+
+  collegeEmailVerifications CollegeEmailVerification[]
+
+  // Academic identity parsed from the verified college email
+  degreeCode             String?
+  degreeName             String?
+  enrollmentYear         Int?
+  academicDepartmentCode String?
+  rollNumber             String?
+  expectedGraduationYear Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -242,5 +262,23 @@ model PhoneVerification {
 
   @@index([userId])
   @@index([phoneNumber])
+  @@index([expiresAt])
+}
+
+model CollegeEmailVerification {
+  id                String    @id @default(cuid())
+  userId            String
+  collegeEmail      String
+  codeHash          String
+  expiresAt         DateTime
+  attempts          Int       @default(0)
+  resendAvailableAt DateTime
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([collegeEmail])
   @@index([expiresAt])
 }

@@ -1,7 +1,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 
 type RouteContext = {
   params: Promise<{ postId: string }>;
@@ -13,12 +13,15 @@ export async function POST(
   { params }: RouteContext,
 ) {
   try {
-    const session = await getCurrentUser();
+    const session = await getVerifiedUser();
 
     if (!session) {
       return NextResponse.json(
-        { error: "You must be logged in." },
-        { status: 401 },
+        {
+          error: "Complete both email verifications to favourite posts.",
+          code: "ACCOUNT_VERIFICATION_REQUIRED",
+        },
+        { status: 403 },
       );
     }
 
@@ -79,12 +82,15 @@ export async function DELETE(
   { params }: RouteContext,
 ) {
   try {
-    const session = await getCurrentUser();
+    const session = await getVerifiedUser();
 
     if (!session) {
       return NextResponse.json(
-        { error: "You must be logged in." },
-        { status: 401 },
+        {
+          error: "Complete both email verifications to modify favourites.",
+          code: "ACCOUNT_VERIFICATION_REQUIRED",
+        },
+        { status: 403 },
       );
     }
 

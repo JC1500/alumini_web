@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/sessions";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 import ProfileForm from "./profile-form";
 import ProfileView from "./profile-view";
 
@@ -25,10 +26,16 @@ export default function MyProfilePage() {
 }
 
 async function ProfileContent() {
-  const session = await getCurrentUser();
+  const session = await getVerifiedUser();
 
   if (!session) {
-    redirect("/sign-in");
+    const currentSession = await getCurrentUser();
+
+    if (!currentSession) {
+      redirect("/sign-in");
+    }
+
+    redirect("/verify-college-email");
   }
 
   const profile = await prisma.alumniProfile.findUnique({
