@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/sessions";
 
 type PostImageInput = {
   imageUrl: string;
@@ -9,9 +9,8 @@ type PostImageInput = {
 };
 
 // Delete only uploads that are still pending and unused.
-// Never delete an image whose pending record has been consumed.
 async function cleanupUnusedUploads(
-  clerkUserId: string,
+  ownerId: string,
   keys: string[],
 ) {
   let r2Module: typeof import("@/lib/r2");
@@ -19,7 +18,10 @@ async function cleanupUnusedUploads(
   try {
     r2Module = await import("@/lib/r2");
   } catch (error) {
-    console.error("Unable to initialize R2 while cleaning up uploads:", error);
+    console.error(
+      "Unable to initialize R2 while cleaning up uploads:",
+      error,
+    );
     return;
   }
 
@@ -27,7 +29,7 @@ async function cleanupUnusedUploads(
     try {
       const deleted = await prisma.pendingPostImage.deleteMany({
         where: {
-          clerkUserId,
+          clerkUserId: ownerId,
           imageKey: key,
           consumedAt: null,
         },
@@ -58,7 +60,7 @@ async function cleanupUnusedUploads(
 }
 
 // GET /api/posts?username=mayank
-// Fetch posts belonging to an alumni profile.
+// Fetch posts belonging to a public alumni profile.
 export async function GET(request: NextRequest) {
   try {
     const username = request.nextUrl.searchParams
@@ -108,20 +110,21 @@ export async function GET(request: NextRequest) {
 // POST /api/posts
 // Create a post and atomically consume its pending images.
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
+  const session = await getCurrentUser();
 
-  if (!userId) {
+  if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to create a post." },
       { status: 401 },
     );
   }
 
+  const userId = session.user.id;
   let imageData: PostImageInput[] = [];
 
   try {
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId: userId },
+      where: { userId },
       select: { id: true },
     });
 
@@ -195,6 +198,7 @@ export async function POST(request: NextRequest) {
         r2,
         bucketName,
       } = await import("@/lib/r2");
+
       const expectedPrefix = `posts/${userId}/`;
 
       if (
@@ -213,7 +217,6 @@ export async function POST(request: NextRequest) {
 
       seenKeys.add(image.imageKey);
 
-      // Verify that the object exists in R2.
       try {
         await r2.send(
           new HeadObjectCommand({
@@ -231,8 +234,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Verify that every image has an unused, unexpired upload
-    // record belonging to this authenticated user.
+    // Transitional note: the existing database field is still
+    // named clerkUserId. The upload API must use this same owner ID
+    // until that field is migrated to userId in Prisma.
     const pendingImages =
       imageData.length === 0
         ? []
@@ -280,8 +284,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Claim all pending images and create the post in one
-    // database transaction. Failed claims roll back everything.
     const post = await prisma.$transaction(async (tx) => {
       for (const image of imageData) {
         const claim = await tx.pendingPostImage.updateMany({
@@ -323,8 +325,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Create post error:", error);
 
-    // Clean up only uploads that remain unconsumed.
-    // This also runs after a failed transaction.
     if (imageData.length > 0) {
       await cleanupUnusedUploads(
         userId,
@@ -339,11 +339,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-
+// DELETE /api/posts?id=POST_ID
 export async function DELETE(request: NextRequest) {
-  const { userId } = await auth();
+  const session = await getCurrentUser();
 
-  if (!userId) {
+  if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to delete a post." },
       { status: 401 },
@@ -352,7 +352,7 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId: userId },
+      where: { userId: session.user.id },
       select: { id: true },
     });
 
@@ -372,7 +372,7 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Verify ownership before deleting anything.
+    // Only the post owner may delete the post.
     const post = await prisma.post.findFirst({
       where: {
         id: postId,
@@ -395,23 +395,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Delete the post and its PostImage records.
-    // Your Prisma cascade relation handles the associated records.
-    
-    // Delete the database record first.
-    // The related PostImage records are removed by Prisma's cascade.
     await prisma.post.delete({
       where: { id: post.id },
     });
 
-    // Delete the associated R2 objects after the DB deletion succeeds.
     let failedCleanupCount = 0;
 
     if (post.images.length > 0) {
       try {
-        const { r2, bucketName, DeleteObjectCommand } = await import(
-          "@/lib/r2"
-        );
+        const {
+          r2,
+          bucketName,
+          DeleteObjectCommand,
+        } = await import("@/lib/r2");
+
         const cleanupResults = await Promise.allSettled(
           post.images.map((image) =>
             r2.send(
@@ -431,6 +428,7 @@ export async function DELETE(request: NextRequest) {
           `Failed to initialize R2 while deleting images for post ${post.id}:`,
           error,
         );
+
         failedCleanupCount = post.images.length;
       }
     }
@@ -446,7 +444,6 @@ export async function DELETE(request: NextRequest) {
       message: "Post deleted successfully.",
       imageCleanupPending: failedCleanupCount > 0,
     });
-
   } catch (error) {
     console.error("Delete post error:", error);
 

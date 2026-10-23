@@ -8,46 +8,47 @@ datasource db {
 }
 
 model AlumniProfile {
-  id             String   @id @default(cuid())
-  clerkUserId    String   @unique
-  fullName       String
-  username       String   @unique
-  headline       String
-  bio            String  @db.Text
+  id              String  @id @default(cuid())
+  clerkUserId     String? @unique
+  userId          String? @unique
+  user            User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  fullName        String
+  username        String  @unique
+  headline        String
+  bio             String  @db.Text
   profileImageUrl String?
   profileImageKey String?
   coverImageUrl   String?
   coverImageKey   String?
-  department     String
-  graduationYear Int
-  degree         String?
-  company        String?
-  jobTitle       String?
-  location       String
-  country        String   @default("India")
+  department      String
+  graduationYear  Int
+  degree          String?
+  company         String?
+  jobTitle        String?
+  location        String
+  country         String  @default("India")
 
   // Temporarily optional for migration
-  state          String
-  district       String
-  city           String
+  state    String
+  district String
+  city     String
 
-  posts Post[]
-  conversationsAsParticipantA Conversation[] @relation("ConversationParticipantA")
-  conversationsAsParticipantB Conversation[] @relation("ConversationParticipantB")
-  conversationParticipants ConversationParticipant[]
-  sentMessages Message[]
-  favourites Favourite[]
+  posts                       Post[]
+  conversationsAsParticipantA Conversation[]            @relation("ConversationParticipantA")
+  conversationsAsParticipantB Conversation[]            @relation("ConversationParticipantB")
+  conversationParticipants    ConversationParticipant[]
+  sentMessages                Message[]
+  favourites                  Favourite[]
 
-  skills         String[] @default([])
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  skills    String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fullName])
   @@index([graduationYear])
   @@index([department])
   @@index([company])
 }
-
 
 model Post {
   id        String   @id @default(cuid())
@@ -56,8 +57,8 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  author AlumniProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  images PostImage[]
+  author     AlumniProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images     PostImage[]
   favourites Favourite[]
 
   @@index([authorId, createdAt])
@@ -75,13 +76,12 @@ model PostImage {
   @@index([postId])
 }
 
-
 model PendingPostImage {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   clerkUserId String
   imageUrl    String
-  imageKey    String   @unique
-  createdAt   DateTime @default(now())
+  imageKey    String    @unique
+  createdAt   DateTime  @default(now())
   expiresAt   DateTime
   consumedAt  DateTime?
 
@@ -96,8 +96,8 @@ model Conversation {
   updatedAt      DateTime @updatedAt
   lastMessageAt  DateTime @default(now())
 
-  participantA AlumniProfile @relation("ConversationParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
-  participantB AlumniProfile @relation("ConversationParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  participantA AlumniProfile             @relation("ConversationParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB AlumniProfile             @relation("ConversationParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages     Message[]
 
@@ -139,9 +139,108 @@ model Favourite {
   createdAt DateTime @default(now())
 
   user AlumniProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@index([userId])
   @@index([postId])
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum OAuthProvider {
+  GOOGLE
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  passwordHash  String?
+  emailVerified Boolean    @default(false)
+  phoneNumber   String?    @unique
+  phoneVerified Boolean    @default(false)
+  status        UserStatus @default(ACTIVE)
+
+  oauthAccounts OAuthAccount[]
+  sessions      Session[]
+  profile       AlumniProfile?
+  resetTokens   PasswordResetToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+  createdAt         DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PendingRegistration {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  codeHash          String
+  expiresAt         DateTime
+  attempts          Int      @default(0)
+  resendAvailableAt DateTime
+  createdAt         DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PhoneVerification {
+  id                String    @id @default(cuid())
+  userId            String
+  phoneNumber       String
+  providerRequestId String?
+  codeHash          String?
+  expiresAt         DateTime
+  attempts          Int       @default(0)
+  resendAvailableAt DateTime
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
+  @@index([phoneNumber])
+  @@index([expiresAt])
 }

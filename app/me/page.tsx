@@ -1,8 +1,8 @@
 
 import { Suspense } from "react";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/sessions";
 import ProfileForm from "./profile-form";
 import ProfileView from "./profile-view";
 
@@ -25,14 +25,14 @@ export default function MyProfilePage() {
 }
 
 async function ProfileContent() {
-  const { userId } = await auth();
+  const session = await getCurrentUser();
 
-  if (!userId) {
+  if (!session) {
     redirect("/sign-in");
   }
 
   const profile = await prisma.alumniProfile.findUnique({
-    where: { clerkUserId: userId },
+    where: { userId: session.user.id },
   });
 
   const isProfileFilled =
@@ -44,7 +44,10 @@ async function ProfileContent() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold">Create your alumni profile</h1>
+      <h1 className="text-3xl font-bold">
+        Create your alumni profile
+      </h1>
+
       <p className="mt-2 mb-8 text-gray-600 dark:text-gray-400">
         Add your details so fellow alumni can learn about you.
       </p>

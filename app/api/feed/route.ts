@@ -1,23 +1,25 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/sessions";
 
 // GET /api/feed
 // GET /api/feed?cursor=POST_ID&limit=10
 export async function GET(request: NextRequest) {
   try {
-    const { userId: clerkUserId } = await auth();
+    // Authenticate using the custom session cookie.
+    const session = await getCurrentUser();
 
-    if (!clerkUserId) {
+    if (!session) {
       return NextResponse.json(
         { error: "You must be logged in to view the feed." },
         { status: 401 },
       );
     }
 
+    // Find the alumni profile linked to the authenticated user.
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId },
+      where: { userId: session.user.id },
       select: { id: true },
     });
 

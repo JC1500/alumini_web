@@ -1,12 +1,14 @@
 
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth/sessions";
 import FeedList from "@/components/feed/FeedList";
 
-export default async function FeedPage() {
-  const { userId } = await auth();
+export const dynamic = "force-dynamic";
 
-  if (!userId) {
+export default async function FeedPage() {
+  const session = await getCurrentUser();
+
+  if (!session) {
     redirect("/sign-in");
   }
 
@@ -17,6 +19,7 @@ export default async function FeedPage() {
           <h1 className="text-2xl font-bold tracking-tight">
             Alumni Feed
           </h1>
+
           <p className="mt-1 text-sm text-gray-500">
             Discover what your alumni community is sharing.
           </p>
@@ -27,4 +30,3 @@ export default async function FeedPage() {
     </main>
   );
 }
-

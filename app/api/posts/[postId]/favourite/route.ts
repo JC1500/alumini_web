@@ -1,7 +1,7 @@
 
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth/sessions";
 
 type RouteContext = {
   params: Promise<{ postId: string }>;
@@ -12,20 +12,20 @@ export async function POST(
   _request: Request,
   { params }: RouteContext,
 ) {
-  const { userId: clerkUserId } = await auth();
-
-  if (!clerkUserId) {
-    return NextResponse.json(
-      { error: "You must be logged in." },
-      { status: 401 },
-    );
-  }
-
   try {
+    const session = await getCurrentUser();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "You must be logged in." },
+        { status: 401 },
+      );
+    }
+
     const { postId } = await params;
 
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId },
+      where: { userId: session.user.id },
       select: { id: true },
     });
 
@@ -78,20 +78,20 @@ export async function DELETE(
   _request: Request,
   { params }: RouteContext,
 ) {
-  const { userId: clerkUserId } = await auth();
-
-  if (!clerkUserId) {
-    return NextResponse.json(
-      { error: "You must be logged in." },
-      { status: 401 },
-    );
-  }
-
   try {
+    const session = await getCurrentUser();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "You must be logged in." },
+        { status: 401 },
+      );
+    }
+
     const { postId } = await params;
 
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId },
+      where: { userId: session.user.id },
       select: { id: true },
     });
 

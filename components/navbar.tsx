@@ -1,54 +1,121 @@
+
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Show, useClerk, useUser } from "@clerk/nextjs";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+type CurrentUser = {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  status: "ACTIVE" | "SUSPENDED";
+  profile: {
+    id: string;
+    username: string;
+    fullName: string;
+  } | null;
+};
+
 export default function Navbar() {
+  const router = useRouter();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [showBottomNav, setShowBottomNav] = useState(false);
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
 
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        setUser(null);
+        return;
+      }
+
+      const data = (await response.json()) as {
+        user?: CurrentUser | null;
+      };
+
+      setUser(data.user ?? null);
+    } catch (error) {
+      console.error("Unable to fetch current user:", error);
+      setUser(null);
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
+  const handleSignOut = async () => {
+    if (signingOut) return;
+
+    setSigningOut(true);
+
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to sign out.");
+      }
+
+      setUser(null);
+      setMenuOpen(false);
+      setShowBottomNav(false);
+      router.replace("/");
+      router.refresh();
+    } catch (error) {
+      console.error("Sign-out failed:", error);
+      window.alert("Unable to sign out. Please try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   const initial =
-    user?.fullName?.trim().charAt(0).toUpperCase() ||
-    user?.primaryEmailAddress?.emailAddress?.charAt(0).toUpperCase() ||
+    user?.profile?.fullName?.trim().charAt(0).toUpperCase() ||
+    user?.email?.charAt(0).toUpperCase() ||
     "U";
 
   /*
-   * Show bottom navigation when scrolling UP.
-   * Hide it when scrolling DOWN.
+   * Show bottom navigation when scrolling up.
+   * Hide it when scrolling down.
    */
   useEffect(() => {
     let lastScrollY = window.scrollY;
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-
-      // Small tolerance so tiny scroll movements don't constantly
-      // show/hide the navigation.
       const scrollDifference = Math.abs(currentScrollY - lastScrollY);
 
-      if (scrollDifference < 5) {
-        return;
-      }
+      if (scrollDifference < 5) return;
 
-      // User is scrolling UP
       if (currentScrollY < lastScrollY) {
         setShowBottomNav(true);
-      }
-
-      // User is scrolling DOWN
-      else {
+      } else {
         setShowBottomNav(false);
       }
 
       lastScrollY = currentScrollY;
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
@@ -57,9 +124,7 @@ export default function Navbar() {
 
   return (
     <>
-      {/* =========================
-          TOP NAVBAR
-      ========================== */}
+      {/* Top navbar */}
       <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/90 backdrop-blur-xl dark:border-gray-800 dark:bg-gray-950/90">
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           {/* Logo */}
@@ -84,7 +149,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop navigation */}
           <div className="hidden items-center gap-7 md:flex">
             <Link
               href="/"
@@ -93,14 +158,14 @@ export default function Navbar() {
               Home
             </Link>
 
-            <Show when="signed-in">
+            {user && (
               <Link
                 href="/feed"
                 className="text-sm font-medium text-gray-600 hover:text-blue-600 dark:text-gray-300"
               >
                 Feed
               </Link>
-            </Show>
+            )}
 
             <Link
               href="/search"
@@ -121,115 +186,113 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
 
-            {/* Signed out */}
-            <Show when="signed-out">
-              <Link
-                href="/sign-in"
-                className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 sm:inline-flex"
-              >
-                Sign in
-              </Link>
-
-              <Link
-                href="/sign-up"
-                className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                Sign up
-              </Link>
-            </Show>
-
-            {/* Signed in */}
-            <Show when="signed-in">
-              {/* Search */}
-              <Link
-                href="/search"
-                aria-label="Search alumni"
-                className="rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="size-5"
-                  aria-hidden="true"
+            {!authLoading && !user && (
+              <>
+                <Link
+                  href="/sign-in"
+                  className="hidden rounded-full px-4 py-2 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 sm:inline-flex"
                 >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m16 16 4 4" />
-                </svg>
-              </Link>
+                  Sign in
+                </Link>
 
-              {/* Profile menu */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((open) => !open)}
-                  aria-label="Open user menu"
-                  aria-expanded={menuOpen}
-                  className="flex size-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800 ring-2 ring-transparent transition hover:ring-blue-400 dark:bg-blue-950 dark:text-blue-200"
+                <Link
+                  href="/sign-up"
+                  className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                 >
-                  {initial}
-                </button>
+                  Sign up
+                </Link>
+              </>
+            )}
 
-                {menuOpen && (
-                  <>
-                    {/* Overlay */}
-                    <button
-                      type="button"
-                      aria-label="Close user menu"
-                      className="fixed inset-0 z-40 cursor-default"
-                      onClick={() => setMenuOpen(false)}
-                    />
+            {user && (
+              <>
+                {/* Search */}
+                <Link
+                  href="/search"
+                  aria-label="Search alumni"
+                  className="rounded-full p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="size-5"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m16 16 4 4" />
+                  </svg>
+                </Link>
 
-                    {/* Menu */}
-                    <div className="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-800 dark:bg-gray-950">
-                      <div className="border-b border-gray-100 px-3 py-3 dark:border-gray-800">
-                        <p className="truncate text-sm font-semibold">
-                          {user?.fullName || "Alumini member"}
-                        </p>
+                {/* Profile menu */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen((open) => !open)}
+                    aria-label="Open user menu"
+                    aria-expanded={menuOpen}
+                    className="flex size-10 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-800 ring-2 ring-transparent transition hover:ring-blue-400 dark:bg-blue-950 dark:text-blue-200"
+                  >
+                    {initial}
+                  </button>
 
-                        <p className="truncate text-xs text-gray-500">
-                          {user?.primaryEmailAddress?.emailAddress}
-                        </p>
-                      </div>
-
-                      <Link
-                        href="/me"
-                        onClick={() => setMenuOpen(false)}
-                        className="mt-1 block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        My Profile
-                      </Link>
-
-                      <Link
-                        href="/search"
-                        onClick={() => setMenuOpen(false)}
-                        className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
-                      >
-                        Explore Alumni
-                      </Link>
-
+                  {menuOpen && (
+                    <>
                       <button
                         type="button"
-                        onClick={() => signOut({ redirectUrl: "/" })}
-                        className="block w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
-                      >
-                        Sign out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </Show>
+                        aria-label="Close user menu"
+                        className="fixed inset-0 z-40 cursor-default"
+                        onClick={() => setMenuOpen(false)}
+                      />
+
+                      <div className="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 shadow-xl dark:border-gray-800 dark:bg-gray-950">
+                        <div className="border-b border-gray-100 px-3 py-3 dark:border-gray-800">
+                          <p className="truncate text-sm font-semibold">
+                            {user.profile?.fullName || "Alumini member"}
+                          </p>
+
+                          <p className="truncate text-xs text-gray-500">
+                            {user.email}
+                          </p>
+                        </div>
+
+                        <Link
+                          href="/me"
+                          onClick={() => setMenuOpen(false)}
+                          className="mt-1 block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                          My Profile
+                        </Link>
+
+                        <Link
+                          href="/search"
+                          onClick={() => setMenuOpen(false)}
+                          className="block rounded-xl px-3 py-2.5 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+                        >
+                          Explore Alumni
+                        </Link>
+
+                        <button
+                          type="button"
+                          disabled={signingOut}
+                          onClick={handleSignOut}
+                          className="block w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950"
+                        >
+                          {signingOut ? "Signing out..." : "Sign out"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </nav>
       </header>
 
-      {/* =====================================
-          MOBILE BOTTOM NAVIGATION
-          Appears when user scrolls UP
-      ====================================== */}
-      <Show when="signed-in">
+      {/* Mobile bottom navigation */}
+      {user && (
         <nav
           aria-label="Mobile navigation"
           className={`
@@ -254,7 +317,6 @@ export default function Navbar() {
               href="/feed"
               className="flex h-full min-w-[100px] flex-col items-center justify-center gap-1 text-gray-500 transition hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
             >
-              {/* Feed icon */}
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -269,16 +331,13 @@ export default function Navbar() {
                 <path d="M4 20h7" />
               </svg>
 
-              <span className="text-xs font-medium">
-                Feed
-              </span>
+              <span className="text-xs font-medium">Feed</span>
             </Link>
           </div>
 
-          {/* Safe area for phones with home indicator */}
           <div className="h-[env(safe-area-inset-bottom)]" />
         </nav>
-      </Show>
+      )}
     </>
   );
 }
