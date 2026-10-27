@@ -8,11 +8,22 @@ export type MessageDTO = {
   senderId: string;
   body: string | null;
   createdAt: string;
+  cursor: string;
   deleted: boolean;
 };
 
 export type ConversationDTO = {
   conversationId: string;
+};
+
+export type ConversationHeaderDTO = {
+  conversationId: string;
+  otherParticipant: {
+    id: string;
+    fullName: string;
+    username: string;
+    profileImageUrl: string | null;
+  };
 };
 
 export type InboxItemDTO = {
@@ -28,7 +39,7 @@ export type InboxItemDTO = {
   unreadCount: number;
 };
 
-export function mapMessageDTO(message: Message): MessageDTO {
+export function mapMessageDTO(message: Message, cursor: string): MessageDTO {
   const deleted = message.deletedAt !== null;
 
   return {
@@ -38,6 +49,7 @@ export function mapMessageDTO(message: Message): MessageDTO {
     senderId: message.senderId,
     body: deleted ? null : message.body,
     createdAt: message.createdAt.toISOString(),
+    cursor,
     deleted,
   };
 }
@@ -57,6 +69,21 @@ export function mapMessageNewPayload(message: MessageDTO): MessageNewPayload {
 
 export function mapConversationDTO(id: string): ConversationDTO {
   return { conversationId: id };
+}
+
+export function mapConversationHeaderDTO(
+  conversationId: string,
+  otherParticipant: ConversationHeaderDTO["otherParticipant"],
+): ConversationHeaderDTO {
+  return {
+    conversationId,
+    otherParticipant: {
+      id: otherParticipant.id,
+      fullName: otherParticipant.fullName,
+      username: otherParticipant.username,
+      profileImageUrl: otherParticipant.profileImageUrl,
+    },
+  };
 }
 
 export function mapInboxItemDTO(item: InboxItemDTO): InboxItemDTO {

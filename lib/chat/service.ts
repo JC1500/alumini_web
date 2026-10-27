@@ -2,12 +2,14 @@ import "server-only";
 
 import { Prisma } from "../generated/prisma/client";
 import type {
+  ConversationHeaderDTO,
   ConversationDTO,
   InboxItemDTO,
   MessageDTO,
 } from "./dto";
 import {
   mapConversationDTO,
+  mapConversationHeaderDTO,
   mapInboxItemDTO,
   mapMessageDTO,
   mapMessageNewPayload,
@@ -165,6 +167,32 @@ export async function findOrCreateConversation(
   }
 }
 
+export async function getConversation(
+  conversationId: string,
+  profileId: string,
+): Promise<ConversationHeaderDTO> {
+  const conversation = await requireParticipant(conversationId, profileId);
+  const otherParticipantId =
+    conversation.participantAId === profileId
+      ? conversation.participantBId
+      : conversation.participantAId;
+  const otherParticipant = await prisma.alumniProfile.findUnique({
+    where: { id: otherParticipantId },
+    select: {
+      id: true,
+      fullName: true,
+      username: true,
+      profileImageUrl: true,
+    },
+  });
+
+  if (!otherParticipant) {
+    throw new ChatServiceError("not_found");
+  }
+
+  return mapConversationHeaderDTO(conversation.id, otherParticipant);
+}
+
 export async function sendMessage(
   profileId: string,
   input: SendMessageInput,
@@ -219,7 +247,10 @@ export async function sendMessage(
     message = existingMessage;
   }
 
-  const messageDTO = mapMessageDTO(message);
+  const messageDTO = mapMessageDTO(
+    message,
+    encodeCursor({ createdAt: message.createdAt, id: message.id }),
+  );
   const payload = mapMessageNewPayload(messageDTO);
 
   await Promise.all([
@@ -284,7 +315,12 @@ export async function getMessages(
       : null;
 
   return {
-    items: page.map(mapMessageDTO),
+    items: page.map((message) =>
+      mapMessageDTO(
+        message,
+        encodeCursor({ createdAt: message.createdAt, id: message.id }),
+      ),
+    ),
     nextCursor,
   };
 }

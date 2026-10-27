@@ -33,6 +33,25 @@ async function ProfileContent() {
 
   const profile = await prisma.alumniProfile.findUnique({
     where: { clerkUserId: userId },
+    select: {
+      fullName: true,
+      username: true,
+      headline: true,
+      bio: true,
+      profileImageUrl: true,
+      coverImageUrl: true,
+      department: true,
+      graduationYear: true,
+      degree: true,
+      company: true,
+      jobTitle: true,
+      location: true,
+      skills: true,
+      country: true,
+      state: true,
+      district: true,
+      city: true,
+    },
   });
 
   const isProfileFilled =

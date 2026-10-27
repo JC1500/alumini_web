@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/chat/get-current-profile";
 import {
   findOrCreateConversationInputSchema,
@@ -86,6 +87,55 @@ export async function findOrCreateConversation(
   } catch (error) {
     return actionError(error);
   }
+}
+
+export async function startConversation(
+  username: string,
+  formData: FormData,
+): Promise<void> {
+  void formData;
+  const parsed = findOrCreateConversationInputSchema.safeParse({ username });
+
+  if (!parsed.success) {
+    redirect("/search");
+  }
+
+  const current = await resolveProfile();
+
+  if (!current.ok) {
+    redirect(current.error === "unauthorized" ? "/sign-in" : "/me");
+  }
+
+  let conversationId: string | null = null;
+  let failure: string | null = null;
+
+  try {
+    const conversation = await findOrCreateConversationService(
+      current.profileId,
+      parsed.data.username,
+    );
+    conversationId = conversation.conversationId;
+  } catch (error) {
+    if (error instanceof ChatServiceError) {
+      failure =
+        error.code === "not_found"
+          ? "not_found"
+          : error.code === "invalid_input"
+            ? "invalid_input"
+            : "server_error";
+    } else {
+      console.error("Starting chat conversation failed:", error);
+      failure = "server_error";
+    }
+  }
+
+  if (conversationId) {
+    redirect(`/messages/${conversationId}`);
+  }
+
+  redirect(
+    `/u/${encodeURIComponent(parsed.data.username)}?messageError=${failure ?? "server_error"}`,
+  );
 }
 
 export async function sendMessage(
