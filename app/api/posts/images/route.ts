@@ -1,11 +1,10 @@
 
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
+import { getVerifiedUser } from "@/lib/auth/authorization";
 import {
   r2,
   bucketName,
@@ -25,21 +24,27 @@ const ALLOWED_FORMATS = ["jpeg", "png", "webp"];
 export async function POST(request: Request) {
   const uploadedKeys: string[] = [];
   let userId: string | null = null;
+
   try {
-    // 1. Authenticate the current user
-    const authResult = await auth();
-  userId = authResult.userId;
+    // 1. Authenticate using the custom session system.
+    const session = await getVerifiedUser();
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: "You must be logged in to upload images." },
-        { status: 401 },
-      );
-    }
+if (!session) {
+  return NextResponse.json(
+    {
+      error:
+        "Complete personal and college email verification to upload images.",
+      code: "ACCOUNT_VERIFICATION_REQUIRED",
+    },
+    { status: 403 },
+  );
+}
 
-    // 2. Find the authenticated user's alumni profile.
+userId = session.user.id;
+
+    // 2. Find the profile linked to this database user.
     const profile = await prisma.alumniProfile.findUnique({
-      where: { clerkUserId: userId },
+      where: { userId },
       select: { id: true },
     });
 
@@ -49,7 +54,6 @@ export async function POST(request: Request) {
         { status: 403 },
       );
     }
-
 
     // 3. Read and validate the multipart form.
     const formData = await request.formData();
@@ -78,11 +82,14 @@ export async function POST(request: Request) {
 
     const imageFiles = files as File[];
 
-    // Validate all input sizes before processing or uploading.
+    // Validate every input before processing or uploading.
     for (const file of imageFiles) {
       if (file.size === 0 || file.size > MAX_INPUT_SIZE) {
         return NextResponse.json(
-          { error: "Each image must be larger than 0 bytes and no larger than 5 MB." },
+          {
+            error:
+              "Each image must be larger than 0 bytes and no larger than 5 MB.",
+          },
           { status: 413 },
         );
       }
@@ -146,9 +153,12 @@ export async function POST(request: Request) {
       }
 
       if (!output) {
-        throw new Error("An image could not be compressed below 500 KB.");
+        throw new Error(
+          "An image could not be compressed below 500 KB.",
+        );
       }
 
+      // Store images under the authenticated database user's ID.
       const key = `posts/${userId}/${randomUUID()}.webp`;
 
       await r2.send(
@@ -161,12 +171,13 @@ export async function POST(request: Request) {
         }),
       );
 
-      // Record the key immediately so failed requests can clean it up.
+      // Track the uploaded object so failures can clean it up.
       uploadedKeys.push(key);
 
       const imageUrl = getPublicImageUrl(key);
 
-      // Record ownership of this uploaded image.
+      // Temporary compatibility: the Prisma field is still named
+      // clerkUserId, but now stores the custom User.id.
       await prisma.pendingPostImage.create({
         data: {
           clerkUserId: userId,
@@ -189,40 +200,32 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Post image upload failed:", error);
 
-    // Clean up R2 files if any part of this request fails.
-    
-if (userId) {
-  await Promise.allSettled([
-    prisma.pendingPostImage.deleteMany({
-      where: {
-        clerkUserId: userId,
-        imageKey: { in: uploadedKeys },
-      },
-    }),
-    ...uploadedKeys.map((key) =>
-      r2.send(
-        new DeleteObjectCommand({
-          Bucket: bucketName,
-          Key: key,
-        }),
-      ),
-    ),
-  ]);
-} else {
-  // No authenticated user ID is available.
-  // Still attempt to remove any R2 objects uploaded by this request.
-  await Promise.allSettled(
-    uploadedKeys.map((key) =>
-      r2.send(
-        new DeleteObjectCommand({
-          Bucket: bucketName,
-          Key: key,
-        }),
-      ),
-    ),
-  );
-}
+    // Remove only this request's pending records and uploaded objects.
+    if (uploadedKeys.length > 0) {
+      const cleanupTasks: Promise<unknown>[] = uploadedKeys.map(
+        (key) =>
+          r2.send(
+            new DeleteObjectCommand({
+              Bucket: bucketName,
+              Key: key,
+            }),
+          ),
+      );
 
+      if (userId) {
+        cleanupTasks.push(
+          prisma.pendingPostImage.deleteMany({
+            where: {
+              clerkUserId: userId,
+              imageKey: { in: uploadedKeys },
+              consumedAt: null,
+            },
+          }),
+        );
+      }
+
+      await Promise.allSettled(cleanupTasks);
+    }
 
     const message =
       error instanceof Error

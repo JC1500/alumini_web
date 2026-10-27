@@ -15,13 +15,13 @@ type FeedAuthor = {
   fullName: string;
   profileImageUrl: string | null;
 };
-
 type FeedPost = {
   id: string;
   text: string | null;
   createdAt: string;
   author: FeedAuthor;
   images: FeedImage[];
+  isFavourite: boolean;
 };
 
 type FeedResponse = {
@@ -42,6 +42,64 @@ export default function FeedList() {
   const loadingRef = useRef(false);
   const cursorRef = useRef<string | null>(null);
   const hasMoreRef = useRef(true);
+
+
+  const [favouriteLoading, setFavouriteLoading] = useState<
+    Set<string>
+  >(() => new Set());
+
+  const handleFavourite = async (postId: string) => {
+    const post = posts.find((item) => item.id === postId);
+
+    if (!post || favouriteLoading.has(postId)) return;
+
+    const previousValue = post.isFavourite;
+    const nextValue = !previousValue;
+
+    // Update the UI immediately.
+    setPosts((current) =>
+      current.map((item) =>
+        item.id === postId
+          ? { ...item, isFavourite: nextValue }
+          : item,
+      ),
+    );
+
+    setFavouriteLoading((current) => {
+      const next = new Set(current);
+      next.add(postId);
+      return next;
+    });
+
+    try {
+      const response = await fetch(
+        `/api/posts/${encodeURIComponent(postId)}/favourite`,
+        { method: nextValue ? "POST" : "DELETE" },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update favourite.");
+      }
+    } catch {
+      // Revert the optimistic update on failure.
+      setPosts((current) =>
+        current.map((item) =>
+          item.id === postId
+            ? { ...item, isFavourite: previousValue }
+            : item,
+        ),
+      );
+
+      setError("Couldn't update favourite. Please try again.");
+    } finally {
+      setFavouriteLoading((current) => {
+        const next = new Set(current);
+        next.delete(postId);
+        return next;
+      });
+    }
+  };
+
 
   const loadPosts = useCallback(async (initial = false) => {
     if (loadingRef.current) return;
@@ -106,33 +164,33 @@ export default function FeedList() {
     void loadPosts(true);
   }, [loadPosts]);
 
-  
-useEffect(() => {
-  const target = sentinelRef.current;
-  if (!target) return;
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0];
+  useEffect(() => {
+    const target = sentinelRef.current;
+    if (!target) return;
 
-      if (
-        entry?.isIntersecting &&
-        !loadingRef.current &&
-        autoLoadEnabled &&
-        hasMoreRef.current
-      ) {
-        void loadPosts();
-      }
-    },
-    {
-      rootMargin: "100px 0px",
-    },
-  );
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
 
-  observer.observe(target);
+        if (
+          entry?.isIntersecting &&
+          !loadingRef.current &&
+          autoLoadEnabled &&
+          hasMoreRef.current
+        ) {
+          void loadPosts();
+        }
+      },
+      {
+        rootMargin: "100px 0px",
+      },
+    );
 
-  return () => observer.disconnect();
-}, [loadPosts]);
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [loadPosts]);
 
 
   return (
@@ -194,11 +252,10 @@ useEffect(() => {
 
           {post.images.length > 0 && (
             <div
-              className={`mt-3 grid gap-2 ${
-                post.images.length === 1
+              className={`mt-3 grid gap-2 ${post.images.length === 1
                   ? "grid-cols-1"
                   : "grid-cols-2"
-              }`}
+                }`}
             >
               {post.images.map((image) => (
                 <img
@@ -211,6 +268,34 @@ useEffect(() => {
               ))}
             </div>
           )}
+          
+<div className="mt-4 flex justify-end border-t border-gray-100 pt-3 dark:border-gray-800">
+  <button
+    type="button"
+    onClick={() => void handleFavourite(post.id)}
+    disabled={favouriteLoading.has(post.id)}
+    aria-label={
+      post.isFavourite
+        ? "Remove from favourites"
+        : "Add to favourites"
+    }
+    aria-pressed={post.isFavourite}
+    className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 disabled:cursor-wait disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-900"
+  >
+    <span
+      aria-hidden="true"
+      className={`text-xl ${
+        post.isFavourite
+          ? "text-amber-500"
+          : "text-gray-400"
+      }`}
+    >
+      {post.isFavourite ? "★" : "☆"}
+    </span>
+    {post.isFavourite ? "Saved" : "Save"}
+  </button>
+</div>
+
         </article>
       ))}
 
