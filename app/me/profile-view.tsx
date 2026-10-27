@@ -8,11 +8,31 @@ import ProfileImageManager, {
 } from "@/components/profile/ProfileImageManager";
 import ProfilePosts from "@/components/profile/ProfilePosts";
 
+type ProfileViewProfile = {
+  fullName: string;
+  username: string;
+  headline: string;
+  bio: string;
+  profileImageUrl: string | null;
+  coverImageUrl: string | null;
+  department: string;
+  graduationYear: number;
+  degree: string | null;
+  company: string | null;
+  jobTitle: string | null;
+  location: string;
+  skills: string[];
+  country?: string | null;
+  state?: string | null;
+  district?: string | null;
+  city?: string | null;
+};
+
 export default function ProfileView({
   profile,
   editable = true,
 }: {
-  profile: AlumniProfile;
+  profile: ProfileViewProfile;
   editable?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -30,7 +50,7 @@ export default function ProfileView({
 
   const initial = profile.fullName.trim().charAt(0).toUpperCase();
 
-  if (isEditing) {
+  if (isEditing && editable) {
     return (
       <div>
         <button

@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 export type CurrentProfileResult =
   | { status: "authenticated"; profile: { id: string } }
-  | { status: "unauthenticated" | "profile_missing"; profile: null };
+  | { status: "unauthenticated"; profile: null }
+  | { status: "profile_missing"; profile: null };
 
 export async function getCurrentProfile(): Promise<CurrentProfileResult> {
   const { userId } = await auth();
