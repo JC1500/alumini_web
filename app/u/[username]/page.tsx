@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import ProfileView from "@/app/me/profile-view";
-import { getCurrentProfile } from "@/lib/chat/get-current-profile";
-import MessageButton from "@/components/chat/message-button";
+
 
 export default async function PublicProfilePage({
   params,
@@ -38,9 +37,7 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const viewer = await getCurrentProfile();
-  const canMessage =
-    viewer.status === "authenticated" && viewer.profile.id !== profile.id;
+
   const messageError =
     query.messageError === "not_found"
       ? "That profile could not be found."
@@ -59,11 +56,6 @@ export default async function PublicProfilePage({
         >
           {messageError}
         </p>
-      )}
-      {canMessage && (
-        <div className="mx-auto mb-4 flex max-w-4xl justify-end">
-          <MessageButton username={profile.username} />
-        </div>
       )}
       <ProfileView
         profile={{
